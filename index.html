@@ -395,7 +395,7 @@
                     <i class="fa-solid fa-bowling-ball" aria-hidden="true"></i>
                     <span>Skin Bowling</span>
                 </button>
-                <button type="button" class="skin-bowling-tab" onclick="openHistoryModal()" aria-haspopup="dialog" aria-controls="historyStatsDialog">ประวัติและสถิติ</button><button id="logoutLocalAccount" class="skin-bowling-tab" hidden onclick="PlayerAccounts.logout()">ออกจากบัญชี</button><button id="exitFriendModeTab" type="button" class="skin-bowling-tab" onclick="V13.exitFriendMode()">ออกจากโหมด</button><div class="v13-top-actions lane-actions"><button class="v13-btn" onclick="V13.openLeaderboard()">🏆 LEADERBOARD</button><button class="v13-btn friend" onclick="V13.openFriend()">🎳 PLAY WITH FRIENDS</button></div>
+                <button id="logoutLocalAccount" class="skin-bowling-tab" hidden onclick="PlayerAccounts.logout()">ออกจากบัญชี</button><button id="exitFriendModeTab" type="button" class="skin-bowling-tab" onclick="V13.exitFriendMode()">ออกจากโหมด</button><div class="v13-top-actions lane-actions"><button class="v13-btn" onclick="V13.openLeaderboard()">🏆 LEADERBOARD</button><button class="v13-btn friend" onclick="V13.openFriend()">🎳 PLAY WITH FRIENDS</button></div>
             </div>
 <section id="onlineRoomPanel" hidden aria-label="ห้องออนไลน์"><div id="onlinePlayerRows"></div><p id="onlineTurnStatus" role="status"></p><div class="online-actions"><button id="readyOnlineRoom" class="skin-bowling-tab" onclick="OnlineRooms.ready()">พร้อมเล่น</button><button id="startOnlineRoom" class="skin-bowling-tab account-orange" onclick="OnlineRooms.start()">เริ่มแมตช์</button><button id="leaveOnlineRoom" class="skin-bowling-tab" onclick="OnlineRooms.leave().catch(()=>{})">ออกจากห้อง</button><button class="skin-bowling-tab" onclick="V13.openFriend()">ดูเลขห้อง</button><button id="retryOnlineResult" hidden class="skin-bowling-tab">ส่งผลอีกครั้ง</button><button id="recoverOnlineRoom" hidden class="skin-bowling-tab" onclick="OnlineRooms.recover()">ปิดห้องที่ค้างเกิน 60 วินาที</button></div></section>
 
@@ -2884,8 +2884,9 @@ body.bot-dual #canvasContainer~.absolute{display:none}body.bot-dual #pinScoreBox
             { type: 'HIGH', pins: 8, hook: 0.22, ballTargetX: -0.22, power: 83, name: 'Mix Flush 8' }
         ];
 
-        function triggerCasinoSpin() {
-            if (isBallRolling) return;
+        async function triggerCasinoSpin() {
+            if (isBallRolling || window.FreeAdminBridge?.entryBusy) return;
+            try{await window.FreeAdminBridge.begin('normal');}catch(e){showToast(e.message);return;}
             audioManager.init();
             if (audioManager.bgmEnabled && !audioManager.bgmTimer) {
                 audioManager.startBGM();
@@ -4063,7 +4064,7 @@ function calcPins(){
  if(category===1)return Math.min(9,Math.max(7,Math.round(7+quality*2+(Math.random()-.5)*1.8)));
  return Math.min(6,Math.max(0,Math.round(quality*6+(Math.random()-.5)*3.6)));
 }
-async function throwBall(){if(S.busy||!(S.locked.power&&S.locked.aim&&S.locked.hook)||S.round>5||typeof executeCasinoRoll!=='function'||isBallRolling)return;if(window.OnlineRooms?.active&&!OnlineRooms.canThrow())return;if(!window.OnlineRooms?.active&&window.MatchPlay?.playerDone)return;S.busy=true;paint();if(window.OnlineRooms?.active){try{await OnlineRooms.beginShot(S.val.power,S.val.aim,S.val.hook);}catch(e){S.busy=false;paint();showToast(e.message);return;}}let pins=calcPins(),target=THREE.MathUtils.clamp(S.val.aim/100*.78+S.val.hook/100*.18,-.95,.95),saved=null;try{saved={...casinoState.bets};Object.keys(casinoState.bets).forEach(k=>casinoState.bets[k]=0)}catch(e){}let session=window.MatchPlay?.session;isBallRolling=true;isPhysicsActive=false;setBallSkinSelectorLocked?.(true);executeCasinoRoll({type:pins===10?'STRIKE':pins>=7?'HIGH':'LOW',pins,hook:S.val.hook/100*.8,ballTargetX:target,power:S.val.power,name:'FRIEND SKILL'});const complete=()=>{if(session!==window.MatchPlay?.session)return;if(isBallRolling){setTimeout(complete,100);return;}try{if(saved)casinoState.bets={...saved};updateBettingBoardUI?.()}catch(e){}if(window.OnlineRooms?.active){S.busy=false;resetMeters();return;}let actualPins=window.MatchPlay?.lastPins??pins;let add=actualPins*10+(actualPins===10?25:0);S.total+=add;if(S.round>=5){showToast?.(`จบ 5 ROUNDS • คะแนนรวม ${S.total}`);S.round=6;S.busy=false;paint();document.getElementById('v15Throw').disabled=true;return}S.round++;S.busy=false;resetMeters();queueFriendControls(session)};setTimeout(complete,100)}
+async function throwBall(){if(S.busy||!(S.locked.power&&S.locked.aim&&S.locked.hook)||S.round>5||typeof executeCasinoRoll!=='function'||isBallRolling)return;if(window.OnlineRooms?.active&&!OnlineRooms.canThrow())return;if(!window.OnlineRooms?.active&&window.MatchPlay?.playerDone)return;S.busy=true;paint();if(!window.OnlineRooms?.active&&!window.MatchPlay?.active){try{await window.FreeAdminBridge.begin('normal');}catch(e){S.busy=false;paint();showToast(e.message);return;}}if(window.OnlineRooms?.active){try{await OnlineRooms.beginShot(S.val.power,S.val.aim,S.val.hook);}catch(e){S.busy=false;paint();showToast(e.message);return;}}let pins=calcPins(),target=THREE.MathUtils.clamp(S.val.aim/100*.78+S.val.hook/100*.18,-.95,.95),saved=null;try{saved={...casinoState.bets};Object.keys(casinoState.bets).forEach(k=>casinoState.bets[k]=0)}catch(e){}let session=window.MatchPlay?.session;isBallRolling=true;isPhysicsActive=false;setBallSkinSelectorLocked?.(true);executeCasinoRoll({type:pins===10?'STRIKE':pins>=7?'HIGH':'LOW',pins,hook:S.val.hook/100*.8,ballTargetX:target,power:S.val.power,name:'FRIEND SKILL'});const complete=()=>{if(session!==window.MatchPlay?.session)return;if(isBallRolling){setTimeout(complete,100);return;}try{if(saved)casinoState.bets={...saved};updateBettingBoardUI?.()}catch(e){}if(window.OnlineRooms?.active){S.busy=false;resetMeters();return;}let actualPins=window.MatchPlay?.lastPins??pins;let add=actualPins*10+(actualPins===10?25:0);S.total+=add;if(S.round>=5){showToast?.(`จบ 5 ROUNDS • คะแนนรวม ${S.total}`);S.round=6;S.busy=false;paint();document.getElementById('v15Throw').disabled=true;return}S.round++;S.busy=false;resetMeters();queueFriendControls(session)};setTimeout(complete,100)}
 function newMatch(){S.round=1;S.total=0;S.busy=false;resetMeters()}
 const oldEnter=V13.enterFriendMode,oldExit=V13.exitFriendMode;V13.enterFriendMode=function(){oldEnter();newMatch()};V13.exitFriendMode=function(){oldExit();S.busy=false};requestAnimationFrame(tick);return{refresh:paint,setProgress:(round,total)=>{S.round=round+1;S.total=total;paint();},stop,throwBall,newMatch};})();
 </script>
@@ -4256,34 +4257,38 @@ const firebaseConfig = {
 window.firebaseBoard=[];
 window.PlayerAccounts=(()=>{
  const by=id=>document.getElementById(id);
- let auth,api,db,fs,current=null,loaded=false,busy=false,formMode='login',generation=0,last='',writing=null,pendingName='',loadTask=Promise.resolve(),savingPaused=false,chipLocked=false,cloudBalance=0;
+ let auth,api,db,fs,current=null,loaded=false,busy=false,formMode='login',generation=0,last='',writing=null,pendingName='',loadTask=Promise.resolve(),savingPaused=false,chipLocked=false,cloudBalance=0,historyClientRevision=0;
+ let walletUnsubscribe=null,walletSyncTask=null,walletSeenRevision=0,walletWantedRevision=0;
  function message(text){by('accountStatus').textContent=text;by('accountCloudStatus').textContent=text;}
  function errorText(e){return ({'auth/email-already-in-use':'อีเมลนี้สมัครแล้ว กรุณาเข้าสู่ระบบ','auth/invalid-credential':'อีเมลหรือรหัสผ่านไม่ถูกต้อง','auth/invalid-email':'อีเมลไม่ถูกต้อง','auth/weak-password':'รหัสผ่านไม่ผ่านนโยบาย Firebase','auth/operation-not-allowed':'เปิด Email/Password ใน Firebase Authentication ก่อน','auth/network-request-failed':'เชื่อมต่อไม่ได้ กรุณาตรวจอินเทอร์เน็ต','auth/too-many-requests':'มีคำขอมากเกินไป กรุณาลองใหม่ภายหลัง','auth/user-disabled':'บัญชีนี้ถูกระงับ','permission-denied':'Firebase ไม่อนุญาต กรุณาตรวจ Firestore Rules','unavailable':'ฐานข้อมูลไม่พร้อม กรุณาตรวจอินเทอร์เน็ตและ Firestore'}[e.code])||e.message||String(e);}
  function timed(p){let timer;return Promise.race([p,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('เชื่อมต่อนานเกินไป กรุณาตรวจ Firebase และอินเทอร์เน็ต')),15000)})]).finally(()=>clearTimeout(timer));}
  function controls(value){busy=value;by('accountSubmit').disabled=value;by('logoutLocalAccount').disabled=value;by('accountReset').disabled=value;by('accountRegisterTab').disabled=value;by('accountModeBack').disabled=value;}
  function mode(m){if(busy)return;formMode=m;by('accountForm').dataset.mode=m;by('accountRegisterTab').setAttribute('aria-selected',String(m==='register'));by('accountModeBack').hidden=m!=='register';by('accountFormTitle').textContent=m==='register'?'สมัครสมาชิก':'เข้าสู่ระบบ';by('accountPasswordLabel').textContent=m==='register'?'รหัสผ่าน (อย่างน้อย 8 ตัว)':'รหัสผ่าน';by('accountSubmit').textContent=by('accountFormTitle').textContent;by('accountConfirmLabel').hidden=m!=='register';by('accountConfirm').required=m==='register';by('accountNameLabel').hidden=m!=='register';by('accountUsername').required=m==='register';by('accountPassword').autocomplete=m==='register'?'new-password':'current-password';by('accountPassword').minLength=m==='register'?8:1;}
  function open(){if(casinoState.player.isLoggedIn){openProfileModal();return;}by('playerAccountDialog').showModal();mode('login');}
- function snapshot(){const p=casinoState.player;return {player:{name:p.name,avatarId:p.avatarId,isCustomAvatar:!!p.isCustomAvatar,customAvatarUrl:p.isCustomAvatar?p.customAvatarUrl:null},balance:casinoState.balance,historyJson:JSON.stringify(casinoState.history),round:casinoState.round,stats:V13.getStats(),friendJson:JSON.stringify(MatchPlay.getHistory())};}
+ function snapshot(){const p=casinoState.player;return {historyClientRevision,accountEmail:p.email||'',player:{name:p.name,avatarId:p.avatarId,isCustomAvatar:!!p.isCustomAvatar,customAvatarUrl:p.isCustomAvatar?p.customAvatarUrl:null},balance:casinoState.balance,historyJson:JSON.stringify(casinoState.history),round:casinoState.round,stats:V13.getStats(),friendJson:JSON.stringify(MatchPlay.getHistory())};}
  function defaults(user){return {player:{name:pendingName||user.displayName||user.email.split('@')[0],avatarId:'hellball',isCustomAvatar:false,customAvatarUrl:null},balance:1000,historyJson:'[]',round:1,stats:{totalScore:0,games:0,strikes:0},friendJson:'[]'};}
- function apply(state,user){const normal=JSON.parse(state.historyJson||'[]'),friend=JSON.parse(state.friendJson||'[]');if(!Array.isArray(normal)||!Array.isArray(friend))throw Error('รูปแบบประวัติไม่ถูกต้อง');casinoState.player={...state.player,uid:user.uid,email:user.email,isGoogleAuth:false,isLoggedIn:true};casinoState.balance=Number(state.balance??1000);cloudBalance=casinoState.balance;casinoState.history=normal;casinoState.round=Number(state.round||1);casinoState.bets={};casinoState.previousBets={};V13.setStats(state.stats||{});MatchPlay.restoreHistory(friend);tempSelectedAvatarId=casinoState.player.isCustomAvatar?'custom':casinoState.player.avatarId;tempCustomAvatarUrl=casinoState.player.customAvatarUrl;updatePlayerUI();updateBettingBoardUI();renderRoadHistoryUI();updateHistoryTableUI();}
+ function apply(state,user){historyClientRevision=Number(state.historyRevision)||0;const normal=JSON.parse(state.historyJson||'[]'),friend=JSON.parse(state.friendJson||'[]');if(!Array.isArray(normal)||!Array.isArray(friend))throw Error('รูปแบบประวัติไม่ถูกต้อง');casinoState.player={...state.player,uid:user.uid,email:user.email,isGoogleAuth:false,isLoggedIn:true};casinoState.balance=Number(state.balance??1000);cloudBalance=casinoState.balance;walletSeenRevision=Number(state.walletRevision)||0;walletWantedRevision=walletSeenRevision;casinoState.history=normal;casinoState.round=Number(state.round||1);casinoState.bets={};casinoState.previousBets={};V13.setStats(state.stats||{});MatchPlay.restoreHistory(friend);tempSelectedAvatarId=casinoState.player.isCustomAvatar?'custom':casinoState.player.avatarId;tempCustomAvatarUrl=casinoState.player.customAvatarUrl;updatePlayerUI();updateBettingBoardUI();renderRoadHistoryUI();updateHistoryTableUI();}
  async function avatar(url){if(!url)return null;return new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>{try{const canvas=document.createElement('canvas');canvas.width=canvas.height=128;canvas.getContext('2d').drawImage(image,0,0,128,128);resolve(canvas.toDataURL('image/jpeg',.82));}catch(e){reject(e)}};image.onerror=()=>reject(Error('อ่านรูปโปรไฟล์ไม่ได้'));image.src=url;});}
  async function save(force=false){
+  if(walletSyncTask)await walletSyncTask;
   if(chipLocked)return;
   if(!current||!loaded){if(force)throw Error('ข้อมูลบัญชียังโหลดไม่สำเร็จ');return;}
   if(writing){await writing;if(force)return save(true);return;}
   const uid=current.uid,gen=generation,data=snapshot(),fingerprint=JSON.stringify(data);if(fingerprint===last)return;
   message('กำลังบันทึกข้อมูล…');
   const task=(async()=>{data.player.customAvatarUrl=await avatar(data.player.customAvatarUrl);if(new TextEncoder().encode(JSON.stringify(data)).length>850000)throw Error('ประวัติเกินขนาดเอกสาร ต้องแยกเอกสารประวัติก่อนบันทึกต่อ');const delta=data.balance-cloudBalance;
- const nextBalance=await fs.runTransaction(db,async tx=>{const pr=fs.doc(db,'players',uid),snap=await tx.get(pr);const next=(snap.exists()?Number(snap.data().balance||0):cloudBalance)+delta;if(!Number.isSafeInteger(next)||next<0)throw Error('ยอดชิปเปลี่ยนจากอีกอุปกรณ์ กรุณาเข้าสู่ระบบใหม่');tx.set(pr,{...data,balance:next,updatedAt:fs.serverTimestamp()});tx.set(fs.doc(db,'leaderboard',uid),{name:data.player.name,score:Number(data.stats.totalScore||0),money:next,avatarId:data.player.avatarId,isCustomAvatar:!!data.player.isCustomAvatar,customAvatarUrl:data.player.isCustomAvatar?data.player.customAvatarUrl:null,updatedAt:fs.serverTimestamp()},{merge:true});return next;});if(generation===gen){casinoState.balance+=nextBalance-data.balance;cloudBalance=nextBalance;last=JSON.stringify({...JSON.parse(fingerprint),balance:nextBalance});updatePlayerUI();updateBettingBoardUI();message('บันทึกข้อมูล Firebase แล้ว ✓');}})();
+ let savedRevision=walletSeenRevision;
+ const nextBalance=await fs.runTransaction(db,async tx=>{const pr=fs.doc(db,'players',uid),snap=await tx.get(pr);if(snap.exists()&&(Number(snap.data().historyRevision)||0)!==historyClientRevision){savingPaused=true;throw Error('ผู้ดูแลล้างประวัติแล้ว กรุณาออกจากระบบและเข้าสู่ระบบใหม่ก่อนเล่นต่อ');}const next=(snap.exists()?Number(snap.data().balance||0):cloudBalance)+delta;savedRevision=Number(snap.exists()?snap.data().walletRevision:0)||0;if(!Number.isSafeInteger(next)||next<0)throw Error('ยอดชิปเปลี่ยนจากอีกอุปกรณ์ กรุณาเข้าสู่ระบบใหม่');tx.set(pr,{...data,balance:next,updatedAt:fs.serverTimestamp()},{merge:true});tx.set(fs.doc(db,'leaderboard',uid),{name:data.player.name,score:Number(data.stats.totalScore||0),money:next,avatarId:data.player.avatarId,isCustomAvatar:!!data.player.isCustomAvatar,customAvatarUrl:data.player.isCustomAvatar?data.player.customAvatarUrl:null,updatedAt:fs.serverTimestamp()},{merge:true});return next;});if(generation===gen){casinoState.balance+=nextBalance-data.balance;cloudBalance=nextBalance;walletSeenRevision=Math.max(walletSeenRevision,savedRevision);last=JSON.stringify({...JSON.parse(fingerprint),balance:nextBalance});updatePlayerUI();updateBettingBoardUI();message('บันทึกข้อมูล Firebase แล้ว ✓');}})();
   writing=task;
   try{await task;}catch(e){message('บันทึกไม่สำเร็จ: '+errorText(e));throw e;}finally{if(writing===task)writing=null;}
  }
  async function loadUser(user,gen){
+  walletUnsubscribe?.();walletUnsubscribe=null;walletSeenRevision=walletWantedRevision=0;
   boardUnsubscribe?.();boardUnsubscribe=null;boardUid='';
   loaded=false;savingPaused=false;current=null;by('logoutLocalAccount').hidden=true;by('loginModal').classList.remove('hidden');
   if(!user){casinoState.player.isLoggedIn=false;casinoState.player.uid='';casinoState.player.email='';casinoState.player.name='';casinoState.balance=1000;casinoState.history=[];casinoState.bets={};casinoState.previousBets={};casinoState.round=1;V13.setStats({});MatchPlay.restoreHistory([]);window.firebaseBoard=[];updatePlayerUI();updateBettingBoardUI();renderRoadHistoryUI();updateHistoryTableUI();message('กรุณาเข้าสู่ระบบ');return;}
   message('กำลังโหลดข้อมูล Firebase…');
-  try{const snap=await timed(fs.getDocFromServer(fs.doc(db,'players',user.uid)));if(gen!==generation)return;apply(snap.exists()?snap.data():defaults(user),user);current=user;loaded=true;last=snap.exists()?JSON.stringify(snapshot()):'';if(!snap.exists())await save(true);
+  try{const snap=await timed(fs.getDocFromServer(fs.doc(db,'players',user.uid)));if(gen!==generation)return;apply(snap.exists()?snap.data():defaults(user),user);current=user;loaded=true;last=snap.exists()&&snap.data().accountEmail===user.email?JSON.stringify(snapshot()):'';if(!snap.exists()||snap.data().accountEmail!==user.email)await save(true);
   try{
    const p=casinoState.player;
    const photo=p.isCustomAvatar?await avatar(p.customAvatarUrl):null;
@@ -4294,12 +4299,41 @@ window.PlayerAccounts=(()=>{
     updatedAt:fs.serverTimestamp()
    },{merge:true});
   }catch(e){console.warn('Leaderboard avatar sync',e);}
-  if(gen!==generation)return;by('loginModal').classList.add('hidden');by('playerAccountDialog').close();by('logoutLocalAccount').hidden=false;message('โหลดข้อมูลบัญชีแล้ว ✓');setTimeout(()=>window.OnlineRooms?.reconnect(),0);}
+  if(gen!==generation)return;by('loginModal').classList.add('hidden');by('playerAccountDialog').close();by('logoutLocalAccount').hidden=false;startWalletSync(user.uid,gen);message('โหลดข้อมูลบัญชีแล้ว ✓');setTimeout(()=>window.OnlineRooms?.reconnect(),0);}
   catch(e){if(gen!==generation)return;loaded=false;current=null;casinoState.player.isLoggedIn=false;by('logoutLocalAccount').hidden=false;message('โหลดข้อมูลไม่ได้: '+errorText(e));throw e;}
  }
+
+async function startGamePresence(app,auth,authModule){
+ const m=await import('https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js');
+ const db=m.getDatabase(app,'https://bowling-2c4c0-default-rtdb.asia-southeast1.firebasedatabase.app');
+ let stop=()=>{},serial=Promise.resolve(),generation=0;
+ async function cleanup(){stop();stop=()=>{};m.goOffline(db);}
+ authModule.onAuthStateChanged(auth,user=>{
+  const gen=++generation;
+  serial=serial.catch(()=>{}).then(async()=>{
+   await cleanup();
+   if(!user||gen!==generation)return;
+   m.goOnline(db);
+   stop=m.onValue(m.ref(db,'.info/connected'),async snap=>{
+    if(snap.val()!==true||gen!==generation)return;
+    window.dispatchEvent(new Event('bowling-presence-reconnected'));
+    const con=m.push(m.ref(db,'presence/'+user.uid+'/connections'));
+    const last=m.ref(db,'presence/'+user.uid+'/lastOnline');
+    try{
+     await m.onDisconnect(con).remove();
+     await m.onDisconnect(last).set(m.serverTimestamp());
+     if(gen!==generation)return;
+     await m.set(con,true);
+    }catch(e){console.warn('Presence unavailable',e);}
+   });
+  });
+ });
+ window.stopGamePresence=async()=>{++generation;await cleanup();};
+}
+
  const ready=(async()=>{
   const [appModule,authModule,firestoreModule]=await Promise.all([import('https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js'),import('https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js'),import('https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js')]);
-  const app=appModule.initializeApp(firebaseConfig);api=authModule;fs=firestoreModule;auth=api.getAuth(app);db=fs.getFirestore(app);await api.setPersistence(auth,api.browserLocalPersistence);
+  const app=appModule.initializeApp(firebaseConfig);api=authModule;fs=firestoreModule;auth=api.getAuth(app);db=fs.getFirestore(app);startGamePresence(app,auth,api).catch(e=>console.warn('Presence unavailable',e));await api.setPersistence(auth,api.browserLocalPersistence);
   api.onAuthStateChanged(auth,user=>{const gen=++generation;loadTask=loadUser(user,gen);loadTask.catch(()=>{});});return auth;
  })();
  ready.catch(e=>message('โหลด Firebase ไม่ได้: '+errorText(e)));
@@ -4320,7 +4354,7 @@ window.PlayerAccounts=(()=>{
   }catch(e){message(errorText(e));}finally{pendingName='';controls(false);}
  }
  async function resetPassword(){if(busy)return;const email=by('accountEmail').value.trim();if(!email){message('กรอกอีเมลก่อนขอรีเซ็ตรหัสผ่าน');return;}controls(true);try{await ready;await api.sendPasswordResetEmail(auth,email);message('ส่งคำขอแล้ว กรุณาตรวจอีเมลและโฟลเดอร์สแปม');}catch(e){message(errorText(e));}finally{controls(false);}}
- async function logout(){if(busy)return;if(isBallRolling||MatchPlay.active){showToast('รอให้จบรอบและออกจากแมตช์ก่อนออกจากระบบ');return;}controls(true);try{await ready;if(window.OnlineRooms?.active)await OnlineRooms.leave();savingPaused=true;if(loaded)await save(true);await api.signOut(auth);V13.exitFriendMode();document.getElementById('profileModal').classList.add('hidden');}catch(e){savingPaused=false;message(errorText(e));showToast('ยังไม่ได้ออกจากระบบ: '+errorText(e));}finally{controls(false);}}
+ async function logout(){if(busy)return;if(isBallRolling||MatchPlay.active){showToast('รอให้จบรอบและออกจากแมตช์ก่อนออกจากระบบ');return;}controls(true);try{await ready;if(window.OnlineRooms?.active)await OnlineRooms.leave();savingPaused=true;if(loaded)await save(true);await window.stopGamePresence?.();await api.signOut(auth);V13.exitFriendMode();document.getElementById('profileModal').classList.add('hidden');}catch(e){savingPaused=false;message(errorText(e));showToast('ยังไม่ได้ออกจากระบบ: '+errorText(e));}finally{controls(false);}}
  let boardUnsubscribe=null,boardUid='';
  async function refreshBoard(mode='overall'){
   if(!loaded||!current)return;
@@ -4351,6 +4385,32 @@ window.PlayerAccounts=(()=>{
   finally{chipLocked=false;/* On refresh failure keep autosave paused to protect the server balance. */}
   savingPaused=pausedBefore;if(error)throw error;return result;
  }
+ function startWalletSync(uid,gen){
+  walletUnsubscribe?.();
+  walletUnsubscribe=fs.onSnapshot(fs.doc(db,'walletSignals',uid),snap=>{
+   if(gen!==generation||!snap.exists())return;
+   walletWantedRevision=Math.max(walletWantedRevision,Number(snap.data().revision)||0);
+   syncAdminWallet();
+  },e=>console.warn('Admin wallet signal unavailable; install walletSignals read rule',e.code));
+ }
+ function syncAdminWallet(){
+  if(walletSyncTask||writing||chipLocked||savingPaused||!loaded||!current||isBallRolling||MatchPlay.active||window.OnlineRooms?.active||walletWantedRevision<=walletSeenRevision)return;
+  const gen=generation,uid=current.uid;
+  const task=(async()=>{
+   const snap=await fs.getDocFromServer(fs.doc(db,'players',uid));
+   if(gen!==generation||!loaded||current?.uid!==uid||!snap.exists())return;
+   const data=snap.data(),balance=Number(data.balance),revision=Number(data.walletRevision)||0;
+   if(!Number.isSafeInteger(balance)||balance<0)throw Error('Invalid server wallet');
+   // Keep unsaved local game earnings while rebasing only the remote adjustment.
+   casinoState.balance+=balance-cloudBalance;cloudBalance=balance;
+   walletSeenRevision=Math.max(walletSeenRevision,revision);last='';
+   if(Object.values(casinoState.bets||{}).reduce((sum,n)=>sum+Number(n||0),0)>casinoState.balance){casinoState.bets={};}
+   updatePlayerUI();updateBettingBoardUI();
+   showToast(typeof currentLang!=='undefined'&&currentLang==='en'?'Chip balance updated by admin':'อัปเดตยอดชิปจากผู้ดูแลแล้ว');
+  })();walletSyncTask=task;
+  task.catch(e=>console.warn('Wallet sync will retry',e.code||e.message)).finally(()=>{if(walletSyncTask===task)walletSyncTask=null;});
+ }
+ setInterval(syncAdminWallet,1500);
  mode('login');return{withChipTransaction,getContext:async()=>{await ready;if(!loaded||!current)throw Error('เข้าสู่ระบบและรอโหลดบัญชีก่อน');return{user:current,fs,db};},open,mode,submit,logout,save,resetPassword,refreshBoard};
 })();
 
@@ -4408,6 +4468,7 @@ window.OnlineRooms=(()=>{
  V13.exitFriendMode=function(){if(room&&!entering){leave().catch(()=>{});return;}return baseExit();};
  function enterLane(){if(entered||isBallRolling)return;entering=true;try{baseEnter();entered=true;by('joinRoomDialog').close();V13.close('v13Friend');}finally{entering=false;}}
  async function attach(c,newCode){
+ await window.FreeAdminBridge.begin('online');
  unsubscribe?.();context=c;code=newCode;entered=false;paused=false;shotToken='';leaveRequested=false;window.FriendExperience?.baseline(newCode);
  localStorage.setItem('bowling-online-room:'+c.user.uid,code);
  unsubscribe=c.fs.onSnapshot(ref(),{includeMetadataChanges:true},snap=>{
@@ -4453,10 +4514,10 @@ window.OnlineRooms=(()=>{
  if(canThrow()&&!isBallRolling&&entered)queueFriendControls(MatchPlay.session);
  },error=>{paused=true;failure(error);render();});render();
  }
- async function create(){return action(async()=>{if(room)throw Error('ออกจากห้องเดิมก่อน');if(isBallRolling||MatchPlay.active)throw Error('ออกจากแมตช์และรอให้การโยนจบก่อน');const c=await ctx();await assertNoPendingRoom(c);await PlayerAccounts.save(true);
+ async function create(){return action(async()=>{await window.FreeAdminBridge.begin('online');if(room)throw Error('ออกจากห้องเดิมก่อน');if(isBallRolling||MatchPlay.active)throw Error('ออกจากแมตช์และรอให้การโยนจบก่อน');const c=await ctx();await assertNoPendingRoom(c);await PlayerAccounts.save(true);
  for(let attempt=0;attempt<30;attempt++){const newCode=generateCode(),r=c.fs.doc(c.db,'rooms',newCode);const created=await c.fs.runTransaction(c.db,async tx=>{await checkSession(tx,c,newCode);const snap=await tx.get(r);if(snap.exists())return false;tx.set(c.fs.doc(c.db,'friendSessionsV24',c.user.uid),{roomCode:newCode});tx.set(r,{hostUid:c.user.uid,hostName:casinoState.player.name,guestUid:'',guestName:'',hostReady:false,guestReady:false,hostPaid:false,guestPaid:false,hostClaimed:false,guestClaimed:false,stake:Math.max(0,Math.min(100000,Math.floor(Number(by('onlineDemoStake')?.value||0)/100)*100)),hostPins:[],guestPins:[],status:'waiting',turnUid:'',pending:{},lastShot:{},closedBy:'',createdAt:c.fs.serverTimestamp(),updatedAt:c.fs.serverTimestamp()});return true;});if(created){await attach(c,newCode);if(!by('v13Friend').open)by('v13Friend').showModal();tell('สร้างห้อง '+newCode+' แล้ว ส่งรหัสให้เพื่อนและกดพร้อมในหน้าต่างนี้');return;}}
  throw Error('สร้างรหัสห้องไม่ได้ กรุณาลองใหม่');});}
- async function join(){const newCode=by('joinRoomCode').value.trim();if(!validCode(newCode)){tell('ใช้ตัวเลข 6 หลัก และทั้ง 6 ตัวต้องไม่ซ้ำกัน');return;}return action(async()=>{if(room)throw Error('ออกจากห้องเดิมก่อน');if(isBallRolling||MatchPlay.active)throw Error('ออกจากแมตช์ก่อนเข้าห้อง');const c=await ctx();await assertNoPendingRoom(c,newCode);const r=c.fs.doc(c.db,'rooms',newCode);
+ async function join(){const newCode=by('joinRoomCode').value.trim();if(!validCode(newCode)){tell('ใช้ตัวเลข 6 หลัก และทั้ง 6 ตัวต้องไม่ซ้ำกัน');return;}return action(async()=>{await window.FreeAdminBridge.begin('online');if(room)throw Error('ออกจากห้องเดิมก่อน');if(isBallRolling||MatchPlay.active)throw Error('ออกจากแมตช์ก่อนเข้าห้อง');const c=await ctx();await assertNoPendingRoom(c,newCode);const r=c.fs.doc(c.db,'rooms',newCode);
  await c.fs.runTransaction(c.db,async tx=>{await checkSession(tx,c,newCode);const snap=await tx.get(r);if(!snap.exists())throw Error('ไม่พบห้องนี้');const data=snap.data();if(data.status==='closed')throw Error('ห้องนี้ปิดแล้ว');if([data.hostUid,data.guestUid].includes(c.user.uid)){tx.set(c.fs.doc(c.db,'friendSessionsV24',c.user.uid),{roomCode:newCode});return;}if(data.status!=='waiting'||data.guestUid)throw Error('ห้องเต็มหรือเริ่มเล่นแล้ว');tx.set(c.fs.doc(c.db,'friendSessionsV24',c.user.uid),{roomCode:newCode});tx.update(r,{guestUid:c.user.uid,guestName:casinoState.player.name,guestReady:false,updatedAt:c.fs.serverTimestamp()});});await attach(c,newCode);by('joinRoomDialog').close();if(!by('v13Friend').open)by('v13Friend').showModal();tell('เข้าห้อง '+newCode+' แล้ว กดพร้อมในหน้าต่างนี้');});}
  async function ready(){return action(async()=>{
  if(!room)return;const c=context;
@@ -4498,7 +4559,7 @@ window.OnlineRooms=(()=>{
  if(exitTask)return exitTask;
  exitTask=(async()=>{const c=await PlayerAccounts.getContext(),key='bowling-pending-exit:'+c.user.uid,oldCode=localStorage.getItem(key);if(!oldCode||!validCode(oldCode))return;
  window.FriendExperience?.exitStatus('กำลังยืนยันชิปห้อง '+oldCode+'…',true);
- try{await PlayerAccounts.withChipTransaction(()=>settle(c,c.fs.doc(c.db,'rooms',oldCode),true));if(localStorage.getItem(key)===oldCode)localStorage.removeItem(key);if(localStorage.getItem('bowling-online-room:'+c.user.uid)===oldCode)localStorage.removeItem('bowling-online-room:'+c.user.uid);window.FriendExperience?.exitStatus('ออกจากห้องแล้ว • ยืนยันยอดชิปสำเร็จ',false);}
+ try{await PlayerAccounts.withChipTransaction(()=>settle(c,c.fs.doc(c.db,'rooms',oldCode),true));if(localStorage.getItem(key)===oldCode)localStorage.removeItem(key);if(localStorage.getItem('bowling-online-room:'+c.user.uid)===oldCode)localStorage.removeItem('bowling-online-room:'+c.user.uid);window.FriendExperience?.exitStatus('ออกจากห้องแล้ว • ยืนยันยอดชิปสำเร็จ',false);setTimeout(()=>window.FreeAdminBridge?.releaseIdle(),0);}
  catch(e){window.FriendExperience?.exitStatus('ออกจากสนามแล้ว • ชิปยังไม่ยืนยัน กดตรวจชิปค้างอีกครั้ง',true);showToast(e.code==='permission-denied'?'ออกจากสนามแล้ว แต่ Firebase ปฏิเสธการคืนชิป กรุณา Publish Rules ในคู่มือ Spark':'ออกจากสนามแล้ว รายการชิปค้างถูกเก็บไว้ให้ลองใหม่');throw e;}
  })();try{return await exitTask;}finally{exitTask=null;}
  }
@@ -4527,7 +4588,7 @@ window.OnlineRooms=(()=>{
  function showJoin(){if(room){tell('คุณอยู่ในห้อง '+code+' แล้ว');return;}by('joinRoomCode').value='';tell('กรอกตัวเลข 6 หลักที่เพื่อนส่งให้');by('joinRoomDialog').showModal();}
  window.RoomEntry={open:showJoin,prepare:()=>join().catch(()=>{})};
  const originalRecord=MatchPlay.recordPlayer;MatchPlay.recordPlayer=function(pins){if(room){if(['rolling','active'].includes(room.status))finishShot(pins);return;}return originalRecord(pins);};
- return{retryExit:()=>retryExit().catch(()=>{}),get leaving(){return leaveRequested;},generateCode,validCode,canThrow,beginShot,finishShot,create:()=>create().catch(()=>{}),join:()=>join().catch(()=>{}),ready:()=>ready().catch(()=>{}),claim:()=>claim().catch(()=>{}),start:()=>start().catch(()=>{}),leave,recover:()=>recover().catch(failure),reconnect,render,get active(){return !!room;},get entered(){return entered;}};
+ return{retryExit:()=>retryExit().catch(()=>{}),get leaving(){return leaveRequested;},generateCode,validCode,canThrow,beginShot,finishShot,create:()=>create().catch(()=>{}),join:()=>join().catch(()=>{}),ready:()=>ready().catch(()=>{}),claim:()=>claim().catch(()=>{}),start:()=>start().catch(()=>{}),leave,recover:()=>recover().catch(failure),reconnect,render,get entryPending(){return busy;},get active(){return !!room;},get entered(){return entered;}};
 })();
 
 </script>
@@ -5327,7 +5388,34 @@ else items.push([tr('ชุดโยนครบ 5 ครั้ง','Completed 5
 for(const [label,value] of items){const cell=document.createElement('div'),b=document.createElement('b'),small=document.createElement('small');b.textContent=value??0;small.textContent=label;cell.append(b,small);grid.appendChild(cell);}
 by('publicPlayerNote').textContent=tr('สถิติคำนวณจากประวัติที่ยังเก็บอยู่ ผลชนะ–แพ้ย้อนหลังที่ไม่ได้บันทึกจะไม่นับ และไม่รวมแมตช์ยกเลิกในอัตราชนะ','Statistics reflect retained history. Unrecorded historical outcomes and canceled matches are excluded from win rates.');
 }
-async function open(uid){const id=++token;selected='normal';profile=null;by('publicPlayerName').textContent=tr('กำลังโหลด…','Loading…');by('publicPlayerAvatar').replaceChildren();by('publicPlayerStats').replaceChildren();by('publicPlayerTabs').replaceChildren();by('publicPlayerNote').textContent='';if(!by('publicPlayerDialog').open)by('publicPlayerDialog').showModal();try{const c=await PlayerAccounts.getContext();const snap=await c.fs.getDocFromServer(c.fs.doc(c.db,'leaderboard',uid));if(id!==token)return;if(!snap.exists())throw Error(tr('ยังไม่มีโปรไฟล์สาธารณะ','No public profile yet'));profile=snap.data();if(uid===c.user.uid)profile.publicStats=stats();by('publicPlayerName').textContent=profile.name||'Player';by('publicPlayerAvatar').innerHTML=leaderboardAvatarMarkup({...profile,uid});draw();}catch(e){if(id!==token)return;by('publicPlayerName').textContent=tr('โปรไฟล์ผู้เล่น','Player profile');by('publicPlayerNote').textContent=e.message;}}
+
+let friendPresenceStop=()=>{},friendPresenceVersion=0;
+function clearFriendPresence(){++friendPresenceVersion;friendPresenceStop();friendPresenceStop=()=>{};}
+by('publicPlayerDialog').addEventListener('close',clearFriendPresence);
+async function showFriendPresence(uid,c){
+ clearFriendPresence();const version=friendPresenceVersion;
+ let label=by('publicPlayerPresence');
+ if(!label){label=document.createElement('p');label.id='publicPlayerPresence';label.style.cssText='font-size:14px;margin:8px 0;color:#94a3b8';by('publicPlayerName').after(label);}
+ label.textContent=tr('กำลังตรวจสอบการเชื่อมต่อ…','Checking connection…');
+ try{
+  const m=await import('https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js');
+  if(version!==friendPresenceVersion)return;
+  const db=m.getDatabase((await import('https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js')).getApp(),'https://bowling-2c4c0-default-rtdb.asia-southeast1.firebasedatabase.app');
+  let connected=false,loaded=false,value=null,failed=false;
+  function paint(){
+   if(version!==friendPresenceVersion||failed)return;
+   const online=!!value?.connections&&Object.keys(value.connections).length>0;
+   label.textContent=!connected?tr('รอการเชื่อมต่อ','Waiting for connection'):!loaded?tr('กำลังตรวจสอบ…','Checking…'):online?tr('🟢 ออนไลน์','🟢 Online'):tr('⚪ ออฟไลน์','⚪ Offline');
+   label.style.color=connected&&loaded&&online?'#4ade80':'#94a3b8';
+  }
+  function fail(){if(version!==friendPresenceVersion)return;failed=true;label.textContent=tr('ตรวจสอบสถานะไม่ได้','Status unavailable');}
+  const a=m.onValue(m.ref(db,'.info/connected'),v=>{connected=v.val()===true;paint();},fail);
+  const b=m.onValue(m.ref(db,'presence/'+uid+'/connections'),v=>{value={connections:v.val()};loaded=true;paint();},fail);
+  friendPresenceStop=()=>{a();b();};
+ }catch(e){if(version===friendPresenceVersion)label.textContent=tr('ตรวจสอบสถานะไม่ได้','Status unavailable');}
+}
+
+async function open(uid){clearFriendPresence();by('publicPlayerPresence')?.remove();const id=++token;selected='normal';profile=null;by('publicPlayerName').textContent=tr('กำลังโหลด…','Loading…');by('publicPlayerAvatar').replaceChildren();by('publicPlayerStats').replaceChildren();by('publicPlayerTabs').replaceChildren();by('publicPlayerNote').textContent='';if(!by('publicPlayerDialog').open)by('publicPlayerDialog').showModal();try{const c=await PlayerAccounts.getContext();const snap=await c.fs.getDocFromServer(c.fs.doc(c.db,'leaderboard',uid));if(id!==token)return;if(!snap.exists())throw Error(tr('ยังไม่มีโปรไฟล์สาธารณะ','No public profile yet'));profile=snap.data();if(uid===c.user.uid)profile.publicStats=stats();by('publicPlayerName').textContent=profile.name||'Player';by('publicPlayerAvatar').innerHTML=leaderboardAvatarMarkup({...profile,uid});draw();showFriendPresence(uid,c);}catch(e){if(id!==token)return;by('publicPlayerName').textContent=tr('โปรไฟล์ผู้เล่น','Player profile');by('publicPlayerNote').textContent=e.message;}}
 document.addEventListener('click',e=>{const row=e.target.closest('[data-profile-uid]');if(row?.dataset.profileUid)open(row.dataset.profileUid);});document.addEventListener('keydown',e=>{const row=e.target.closest('[data-profile-uid]');if(row&&row.tagName!=='BUTTON'&&(e.key==='Enter'||e.key===' ')){e.preventDefault();open(row.dataset.profileUid);}});
 const outcomes=new Map();let publishing=false,lastPublished='',publishedUid='';
 function animating(){return isBallRolling||document.body.classList.contains('online-spectating')||document.body.classList.contains('v38-live-view')||window.OnlineRooms?.room?.status==='rolling';}
@@ -5346,6 +5434,82 @@ await c.fs.setDoc(c.fs.doc(c.db,'leaderboard',c.user.uid),{publicStats:summary},
 // Run after idle time, never on the live-view render or account autosave path.
 setInterval(()=>{if(typeof requestIdleCallback==='function')requestIdleCallback(publishIdle);else setTimeout(publishIdle,0);},15000);
 return {stats,aggregate,open,queueOutcome};
+})();</script>
+
+<script id="free-admin-activity-bridge">
+window.FreeAdminBridge=(()=>{
+let sessionId=sessionStorage.getItem('bowling-free-admin-session');if(!sessionId){sessionId=crypto.randomUUID();sessionStorage.setItem('bowling-free-admin-session',sessionId);}
+let running=null,locked=false,ownerUid='',initialized='',initBusy=false;
+const playing=()=>!!(isBallRolling||MatchPlay.active||window.OnlineRooms?.active||window.OnlineRooms?.entryPending);
+const pendingRoom=uid=>!!localStorage.getItem('bowling-online-room:'+uid);
+let recoveryUid='',recoveryRoom='',recoveryDue=true,recoveryAttempts=0,recoveryNext=0;
+const recoveryPaused=()=>!!(playing()||document.hidden||document.body.classList.contains('online-spectating')||document.body.classList.contains('v38-live-view')||window.OnlineRooms?.room?.status==='rolling');
+function requestRecovery(){recoveryDue=true;recoveryAttempts=0;recoveryNext=0;}
+window.addEventListener('online',requestRecovery);
+window.addEventListener('bowling-presence-reconnected',requestRecovery);
+function recoveryShouldRun(now,due,attempts,next){return due&&attempts<3&&now>=next;}
+
+async function begin(mode){
+ if(running||initBusy)throw Error('กำลังยืนยันสถานะบัญชี กรุณารอสักครู่');
+ const task=(async()=>{const c=await PlayerAccounts.getContext();
+ await PlayerAccounts.withChipTransaction(()=>c.fs.runTransaction(c.db,async tx=>{
+  const ref=c.fs.doc(c.db,'playerActivity',c.user.uid),snap=await tx.get(ref),d=snap.exists()?snap.data():null;
+  if(d?.phase==='playing'&&d.sessionId!==sessionId)throw Error('บัญชีนี้ถูกล็อกโดยเกมอีกแท็บหรือแมตช์ที่ยังไม่จบ กรุณากลับไปออกจากแมตช์ก่อน');
+  tx.set(ref,{phase:'playing',mode,sessionId,updatedAt:c.fs.serverTimestamp()},{merge:true});
+ }));locked=true;ownerUid=c.user.uid;initialized=c.user.uid;
+ })();running=task;try{return await task;}finally{if(running===task)running=null;}
+}
+async function clearSettledRoomMarker(uid){
+ const saved=localStorage.getItem('bowling-online-room:'+uid);
+ if(!saved||localStorage.getItem('bowling-pending-exit:'+uid)||recoveryPaused())return;
+ const c=await PlayerAccounts.getContext();
+ if(recoveryPaused())return;
+ const done=await c.fs.runTransaction(c.db,async tx=>{
+  if(recoveryPaused())return false;
+  const state=await tx.get(c.fs.doc(c.db,'playerActivity',uid));
+  if(!state.exists()||state.data().sessionId!==sessionId||state.data().mode!=='online')return false;
+  if(recoveryPaused())return false;
+  const session=await tx.get(c.fs.doc(c.db,'friendSessionsV24',uid));
+  if(!session.exists()||session.data().roomCode!==saved)return false;
+  if(recoveryPaused())return false;
+  const room=await tx.get(c.fs.doc(c.db,'rooms',saved));
+  if(!room.exists())return false;
+  const r=room.data();
+  if(!['finished','closed'].includes(r.status))return false;
+  const mine=r.hostUid===uid?'hostClaimed':r.guestUid===uid?'guestClaimed':null;
+  return !!mine&&r[mine]===true;
+ });
+ if(done&&!recoveryPaused()&&localStorage.getItem('bowling-online-room:'+uid)===saved&&!localStorage.getItem('bowling-pending-exit:'+uid))
+  localStorage.removeItem('bowling-online-room:'+uid);
+}
+async function idle(){
+ if(running||initBusy||!casinoState.player.isLoggedIn){if(!casinoState.player.isLoggedIn)recoveryUid='';return;}
+ if(recoveryPaused())return;
+ const uid=casinoState.player.uid;
+ const savedRoom=localStorage.getItem('bowling-online-room:'+uid)||'';
+ if(recoveryUid!==uid||recoveryRoom!==savedRoom){recoveryUid=uid;recoveryRoom=savedRoom;requestRecovery();}
+ if(pendingRoom(uid)){
+  if(!recoveryShouldRun(Date.now(),recoveryDue,recoveryAttempts,recoveryNext))return;
+  recoveryAttempts++;recoveryNext=Date.now()+30000;
+
+  initBusy=true;
+  try{await clearSettledRoomMarker(uid);}catch(e){console.warn('Room recovery kept locked',e.code||e.message);}finally{initBusy=false;}
+  if(pendingRoom(uid))return;
+ }
+
+ if(!locked&&initialized===uid)return;
+ initBusy=true;
+ try{const c=await PlayerAccounts.getContext();if(playing()||pendingRoom(uid))return;
+ if(!locked){const ref=c.fs.doc(c.db,'playerActivity',uid);await c.fs.runTransaction(c.db,async tx=>{const snap=await tx.get(ref);if(!snap.exists())tx.set(ref,{phase:'idle',mode:'none',sessionId,updatedAt:c.fs.serverTimestamp()});else if(snap.data().phase==='playing'&&snap.data().sessionId===sessionId){locked=true;ownerUid=uid;}});initialized=uid;}
+ if(locked&&ownerUid===uid&&!playing()){
+  // Keep the lock until all local rewards and stakes have reached Firebase.
+  const task=PlayerAccounts.withChipTransaction(()=>c.fs.runTransaction(c.db,async tx=>{const ref=c.fs.doc(c.db,'playerActivity',uid),snap=await tx.get(ref);if(!snap.exists()||snap.data().sessionId!==sessionId)throw Error('สถานะบัญชีเปลี่ยนแล้ว');tx.update(ref,{phase:'idle',mode:'none',updatedAt:c.fs.serverTimestamp()});}));running=task;try{await task;locked=false;}finally{if(running===task)running=null;}
+ }
+ }catch(e){console.warn('Activity lock remains protected',e.code||e.message);}finally{initBusy=false;}
+}
+setInterval(idle,1500);
+const originalBot=MatchPlay.startBot;MatchPlay.startBot=async function(){if(running||isBallRolling)return;try{await begin('bot');return originalBot.apply(this,arguments);}catch(e){showToast(e.message);}};
+return {begin,releaseIdle:()=>idle(),get entryBusy(){return !!running||initBusy;}};
 })();</script>
 </body>
 </html>
